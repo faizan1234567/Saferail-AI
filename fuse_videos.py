@@ -1,3 +1,6 @@
+'''
+fuse optical and infrared frames using TARDAL algorithm.
+'''
 import cv2
 import numpy as np
 import argparse
