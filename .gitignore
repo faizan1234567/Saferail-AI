@@ -1,0 +1,6 @@
+# tensorrt files
+tensorrt_files/
+
+# onnx generated files
+onnx_files/
+
