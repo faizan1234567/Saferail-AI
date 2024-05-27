@@ -1,0 +1,3 @@
+[submodule "TarDAL"]
+	path = TarDAL
+	url = https://github.com/JinyuanLiu-CV/TarDAL.git
