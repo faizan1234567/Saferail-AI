@@ -3,7 +3,7 @@
 Generate an ONNX file from a trained PyTorch model
 ==================================================
 INPUT: PyTorch model (.pt, .pth)
-OUTPUT: ONNX model(.onnx)
+OUTPUT: ONNX model(.onnx) 
 """
 # import dependencies
 import warnings

@@ -4,7 +4,7 @@ Run tensorrt inference using engine file
 python run_tensorrt_inference.py -h
 
 Run tensorrt inference on the images in a directory, or an image.
-And, it does not support video inference. 
+And, it does not support video inference. ..
 ----------------------------------------------------------------
 """
 
