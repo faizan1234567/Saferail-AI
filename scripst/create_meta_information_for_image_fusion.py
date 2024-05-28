@@ -12,26 +12,26 @@ def write_image_names_to_file(image_directory, output_file):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         print("Usage: python write_image_names.py <image_directory> <output_file>")
         sys.exit(1)
 
     image_directory = sys.argv[1]
-    dataset_dir = sys.argv[2]
 
     if not os.path.isdir(image_directory):
         print(f"Error: The directory {image_directory} does not exist.")
         sys.exit(1)
 
     # create meta dir
-    meta_dir_path = os.path.join(dataset_dir, 'meta')
+    meta_dir_path = os.path.join(image_directory, 'meta')
     os.makedirs(meta_dir_path, exist_ok = True)
 
     # pred.txt path
     if os.path.exists(meta_dir_path):
         pred_file_path = os.path.join(meta_dir_path, 'pred.txt')
-
-        write_image_names_to_file(image_directory, pred_file_path)
+        
+        vi_images_dir = os.path.join(image_directory, 'vi')
+        write_image_names_to_file(vi_images_dir, pred_file_path)
 
         print(f"Image names have been written to {pred_file_path}")
     else:
