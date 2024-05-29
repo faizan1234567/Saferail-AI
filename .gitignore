@@ -4,3 +4,5 @@ tensorrt_files/
 # onnx generated files
 onnx_files/
 
+# ignore caches dirs
+/__pycache__/

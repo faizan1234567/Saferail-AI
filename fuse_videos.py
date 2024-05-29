@@ -11,6 +11,8 @@ import time
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings("ignore")
+import sys
+import os
 
 import torch
 from torchvision.transforms import ToTensor, Resize, Grayscale, ToPILImage
@@ -19,9 +21,9 @@ import torchvision.transforms.functional as F
 from torch import Tensor
 
 # import loader
-from config import ConfigDict, from_dict
-from pipeline.fuse import Fuse
-from tools.dict_to_device import dict_to_device
+from TarDAL.config import ConfigDict, from_dict
+from TarDAL.pipeline.fuse import Fuse
+from TarDAL.tools.dict_to_device import dict_to_device
 from kornia.color import rgb_to_ycbcr, bgr_to_rgb, rgb_to_bgr, ycbcr_to_rgb
 
 # load tensorrt engine file
