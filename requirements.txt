@@ -1,0 +1,21 @@
+# SafeRail app dependencies
+# Usage: pip install -r requirments.txt
+
+# Basic 
+numpy>=1.20
+kornia>=0.6.8
+opencv-python>=4.5.5.64
+pyYAML>=6.0
+pandas>=1.5.1
+matplotlib>=3.6.3
+
+# logging
+wandb>=0.12.11
+tqdm>=4.63.0
+tabulate>=0.8.9
+
+# torch and torchvision, it must be customized depending on the 
+# development enviroment, i.e. Jetson platform may need different 
+# versions of torch and torchvision, please follow insturctions 
+# here: https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html
+torchvision==0.16.2
