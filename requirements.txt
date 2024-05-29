@@ -19,3 +19,8 @@ tabulate>=0.8.9
 # versions of torch and torchvision, please follow insturctions 
 # here: https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html
 torchvision==0.16.2
+
+
+# pycuda
+pycuda
+scikit-image
