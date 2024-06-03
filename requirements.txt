@@ -18,7 +18,7 @@ tabulate>=0.8.9
 # development enviroment, i.e. Jetson platform may need different 
 # versions of torch and torchvision, please follow insturctions 
 # here: https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html
-# Note: isntall torchvision before pytorch installation from NVIDIA
+# Note: isntall torchvision before pytorch installation.
 torchvision==0.16.2
 
 
