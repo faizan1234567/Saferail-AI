@@ -40,7 +40,7 @@ logger.addHandler(stream_handler)
 def read_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--file_name', type = str, default= "fusion_onnx_640", help = 'path to save the generated onnx file')
-    parser.add_argument('--cfg', default='config/default.yaml', help='config file path')
+    parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
     parser.add_argument('--weights', type = str, default= "weights/v1/tardal-dt.pth", help = "path to the weights file")
     parser.add_argument('--batch', type = int, default= 32,  help = "batch size")
     opt = parser.parse_args()
@@ -97,7 +97,7 @@ class Pt2ONNX:
 
         assert optical.shape == infrared.shape, "Error: shape mismatch of optical and infrared images"
         assert optical.shape[1] == 1 and infrared.shape[1] ==1, "Error: Should be grayscale images"
-        return (optical, infrared)
+        return (infrared, optical)
     
     def load_weights(self, weights):
         """
@@ -119,14 +119,15 @@ class Pt2ONNX:
         timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         onnx_save = onnx_save + f"_{timestamp}.onnx"
         file_path = os.path.join(dir_name, onnx_save)
-        input = self.create_dummpy_data()
+        ir, vi = self.create_dummpy_data()
+        sample_output = self.model(ir, vi)
         try:
-             torch.onnx.export(self.model, input, file_path, verbose=verbose, 
-                               export_params=True, do_constant_folding=True, input_names=["input"], 
-                               output_names= ["output"], dynamic_axes= {'input' : {0: 'batch_size'}, 
+             torch.onnx.export(self.model, args=(ir, vi), f=file_path, verbose=verbose, 
+                               export_params=True, do_constant_folding=True, input_names=["infrared", "optical"], 
+                               output_names= ["fused"], dynamic_axes= {'input' : {0: 'batch_size'}, 
                                                                        'output' : {0: 'batch_size'}})
         except FileNotFoundError:
-            logger.info(f"File not Found {onnx_save}")
+            logger.info(f"File not Found {file_path}")
 
 
 
