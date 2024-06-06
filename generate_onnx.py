@@ -20,13 +20,13 @@ import logging
 import time
 import argparse
 import yaml
-from config import ConfigDict, from_dict
+from TarDAL.config import ConfigDict, from_dict
 from pathlib import Path
 import os
 from datetime import datetime
 
 # from pipeline.fuse import Fuse
-from module.fuse.generator import Generator
+from TarDAL.module.fuse.generator import Generator
 
 # configure logger
 logger = logging.getLogger(__name__)
@@ -50,7 +50,8 @@ class Pt2ONNX:
     
     def __init__(self, trained_weights: Path, cfg: Union[Path, Dict], batch_size: int = 32,
                  image_shape: Tuple[int, int, int]= (640, 640, 1)) -> None:
-        """constructor method
+        """
+        constructor method
         
         takes trained model weights and configuration file.
         """
@@ -76,7 +77,10 @@ class Pt2ONNX:
 
         # load ckpt to the model
         logger.info("Loading model weights to the model")
-        ckpt = torch.load(trained_weights, map_location= 'cpu')
+        map_location = lambda storage, loc: storage
+        if torch.cuda.is_available():
+            map_location = None
+        ckpt = torch.load(trained_weights, map_location= map_location)
         self.load_weights(ckpt)
         self.model.eval()
 
@@ -88,8 +92,8 @@ class Pt2ONNX:
         i.e. for image fusion we need a tuple of images (one for optical and one for thermal)
         """
         # create a batch of vi and ir images
-        optical = torch.randn(self.image_shape, dtype = torch.float32).permute(0, 3, 1, 2)
-        infrared = torch.randn(self.image_shape, dtype = torch.float32).permute(0, 3, 1, 2)
+        optical = torch.randn(self.image_shape, dtype = torch.float32, requires_grad=True).permute(0, 3, 1, 2)
+        infrared = torch.randn(self.image_shape, dtype = torch.float32, requires_grad=True).permute(0, 3, 1, 2)
 
         assert optical.shape == infrared.shape, "Error: shape mismatch of optical and infrared images"
         assert optical.shape[1] == 1 and infrared.shape[1] ==1, "Error: Should be grayscale images"
@@ -117,7 +121,10 @@ class Pt2ONNX:
         file_path = os.path.join(dir_name, onnx_save)
         input = self.create_dummpy_data()
         try:
-             torch.onnx.export(self.model, input, file_path, verbose=verbose)
+             torch.onnx.export(self.model, input, file_path, verbose=verbose, 
+                               export_params=True, do_constant_folding=True, input_names=["input"], 
+                               output_names= ["output"], dynamic_axes= {'input' : {0: 'batch_size'}, 
+                                                                       'output' : {0: 'batch_size'}})
         except FileNotFoundError:
             logger.info(f"File not Found {onnx_save}")
 
