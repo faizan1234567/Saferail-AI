@@ -239,11 +239,9 @@ if __name__ == "__main__":
                         image_shape= image_shape, img_transforms= transformation,
                         homography_mat= args.homography)
     
-    # dataset for inference and visualizatoin
-    dataset = cDataset(args.data, transforms= transformation,  homography_mat=args.homography)
-    
     
     if args.data:
+        dataset = cDataset(dir=args.data, transforms= transformation,  homography_mat=args.homography)
         logger.info("Running image fusion on the dataset")
         fuse(trt_runner, dataset, args.batch, save_dir= args.save, target_dtype=data_type)
     else:
