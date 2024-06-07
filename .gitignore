@@ -6,3 +6,9 @@ onnx_files/
 
 # ignore caches dirs
 /__pycache__/
+
+# ignore virtual enviroment
+videos/
+
+safeRail/
+
