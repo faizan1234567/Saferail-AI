@@ -12,8 +12,9 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import tensorrt as trt
-import pycuda.driver as cuda
-import pycuda.autoinit
+# import pycuda.driver as cuda
+# import pycuda.autoinit
+from cuda import cudart
 import argparse
 import logging
 import numpy as np
@@ -51,6 +52,7 @@ def read_args():
     parser.add_argument('--fp16', action= "store_true",  help = 'use fp16 precisoin')
     parser.add_argument('--batch', type = int, default=32, help = 'batch size')
     parser.add_argument('--homography', type = str, default = 'camera_data/homography.npz', help = 'homography path')
+    parser.add_argument('--plot', action= "store_true", help = "plot fusion result")
     opt = parser.parse_args()
     return opt
 
@@ -87,6 +89,7 @@ class cDataset:
         else:
             return None
 
+
     def __getitem__(self, ind):
         img_name = self.vi_images[ind]
         vi_image = os.path.join(self.vi, self.vi_images[ind])
@@ -102,118 +105,129 @@ class cDataset:
         return (vi, ir, img_name)
 
 
+
+
 # run tnesorrt engine and customize it tpothe fusion task.
 class RunTRT:
     def __init__(self, engine_file: Path, data_type: str = "fp16", batch_size: int = 32,
-                 image_shape: Tuple[int, int, int]= (640, 640, 1), img_transforms: torchvision.transforms = None, 
-                 homography_mat: Path = None):
+                 image_shape: Tuple[int, int, int]= (640, 640, 1)):
         
         self.engine_file = engine_file
         self.data_type = data_type
         self.batch_size = batch_size
         self.image_shape = image_shape
-        self.transformations = img_transforms
-        self.homograhy_data = np.load(homography_mat)
-        self.h_matrix = self.homograhy_data["homography"]
-
-        # sample data load
-        dataset = cDataset("images/", transforms= self.transformations,  homography_mat=self.h_matrix)
-        self.data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
-
-        self.target_dtype = np.float16 if self.data_type == "fp16" else np.float32
-        self.output = np.empty([self.batch_size, self.image_shape[0], self.image_shape[1], self.image_shape[2]], dtype = self.target_dtype)
+         
         
-        # set dummy data 
-        self.optical_batch, self.infrared_batch, self.processed_optical, self.processed_infrared = self.set_dummy_data()
+        self.load_engine()
+        self.engine = trt.Runtime(self.logger).deserialize_cuda_engine(self.engineString)          # create inference Engine using Runtime
+        if self.engine == None:
+            print("Failed building engine!")
+        print("Succeeded building engine!") 
+
+
+        self.nIO = self.engine.num_io_tensors                                                 # since TensorRT 8.5, the concept of Binding is replaced by I/O Tensor, all the APIs with "binding" in their name are deprecated
+        self.lTensorName = [self.engine.get_tensor_name(i) for i in range(self.nIO)]               # get a list of I/O tensor names of the engine, because all I/O tensor in Engine and Excution Context are indexed by name, not binding number like TensorRT 8.4 or before
+        self.nInput = [self.engine.get_tensor_mode(self.lTensorName[i]) for i in range(self.nIO)].count(trt.TensorIOMode.INPUT)  # get the count of input tensor
+        self.nOutput = [self.engine.get_tensor_mode(self.lTensorName[i]) for i in range(self.nIO)].count(trt.TensorIOMode.OUTPUT)  # get the count of output tensor
+
+        self.context = self.engine.create_execution_context()                                 # create Excution Context from the engine (analogy to a GPU context, or a CPU process)
+        self.context.set_input_shape(self.lTensorName[0], (1, 1, 640, 640))                   # set actual size of input tensor if using Dynamic Shape mode
         
-        # allocating device memory
-        f = open(self.engine_file, "rb")
-        self.runtime = trt.Runtime(trt.Logger(trt.Logger.WARNING)) 
+    def load_engine(self):
+        self.logger = trt.Logger(trt.Logger.ERROR)                                 # create Logger, avaiable level: VERBOSE, INFO, WARNING, ERRROR, INTERNAL_ERROR
+        if os.path.isfile(self.engine_file):                                       # load serialized network and skip building process if .plan file existed
+            with open(self.engine_file, "rb") as f:
+                self.engineString = f.read()
+            if self.engineString == None:
+                print("Failed getting serialized engine!")
+                return
+            print("Succeeded getting serialized engine!")
+        else:                                                                       # build a serialized network from scratch
+            builder = trt.Builder(logger)                                           # create Builder
+            network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))  # create Network
+            profile = builder.create_optimization_profile()                         # create Optimization Profile if using Dynamic Shape mode
+            config = builder.create_builder_config()                                # create BuidlerConfig to set meta data of the network
+            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, 1 << 30)     # set workspace for the optimization process (default value is total GPU memory)
 
-        self.engine = self.runtime.deserialize_cuda_engine(f.read())
-        self.context = self.engine.create_execution_context()
+            inputTensor = network.add_input("inputT0", trt.float32, [-1, -1, -1])   # set inpute tensor for the network
+            profile.set_shape(inputTensor.name, [1, 1, 1], [3, 4, 5], [6, 8, 10])   # set danamic range of the input tensor
+            config.add_optimization_profile(profile)                                # add the Optimization Profile into the BuilderConfig
 
-        # allocate device memory
-        self.d_input1 = cuda.mem_alloc(1 * self.optical_batch.nbytes)
-        self.d_input2 = cuda.mem_alloc(1 * self.infrared_batch.nbytes)
-        self.d_inputs = [self.d_input1, self.d_input2]
-        self.d_output = cuda.mem_alloc(1 * self.output.nbytes)
+            identityLayer = network.add_identity(inputTensor)                       # here is only a identity transformation layer in our simple network, which the output is exactly equal to input
+            network.mark_output(identityLayer.get_output(0))                        # mark the output tensor of the network
 
-        self.bindings = [int(self.d_input1), int(self.d_input2), int(self.d_output)]
+            engineString = builder.build_serialized_network(network, config)        # create a serialized network
+            if engineString == None:
+                print("Failed building serialized engine!")
+                return
+            print("Succeeded building serialized engine!")
+            with open(self.engine_file, "wb") as f:                                 # write the serialized netwok into a .plan file
+                f.write(engineString)
+                print("Succeeded saving .plan file!")
 
-        self.stream = cuda.Stream()
-    
-    # create image batch
-    def create_img_batch(self):
-        # change dtype to float16
-        (vi, ir, _) = next(iter(self.data_loader))
-        ir_batch, vi_batch = ir.permute(0, 2, 3, 1).numpy().astype(self.target_dtype), vi.permute(0, 2, 3, 1).numpy().astype(self.target_dtype)
-        return (ir_batch, vi_batch)
-    
-    # preprocess the images
-    def preprocess_image(self, img):
-        norm = Normalize(mean=[0.485], std=[0.229])
-        result = norm(torch.from_numpy(img).transpose(0,2).transpose(1,2))
-        return np.array(result, dtype=np.float16)
 
-    # create dummy data
-    def set_dummy_data(self):
-        """
-        create dummy infrared and optical image pairs for tensorrt engine file
-        """
-        infrared_batch, optical_batch= self.create_img_batch()
+    def run_trt_inference(self, inputs: Tuple[np.ndarray, np.ndarray]):
+        bufferH = []
+        for i in range(len(inputs)):                                                    # prepare the memory buffer on host and device
+            bufferH.append(np.ascontiguousarray(inputs[i]))
 
-        assert optical_batch.shape == infrared_batch.shape, "Error: shape mismatch"
-        assert optical_batch.dtype == infrared_batch.dtype, "Error: dtype mismatch"
+        for i in range(self.nInput, self.nIO):
+            bufferH.append(np.empty(self.context.get_tensor_shape(self.lTensorName[i]), dtype=trt.nptype(self.engine.get_tensor_dtype(self.lTensorName[i]))))
 
-        # preprocess the data
-        preprocessed_optical = np.array([self.preprocess_image(image) for image in optical_batch])
-        preprocessed_infrared = np.array([self.preprocess_image(image) for image in infrared_batch])
+        bufferD = []
+        for i in range(self.nIO):
+            bufferD.append(cudart.cudaMalloc(bufferH[i].nbytes)[1])
 
-        return (optical_batch, infrared_batch, preprocessed_optical, preprocessed_infrared)
-    
-    # run inference
-    def predict(self, inputs:Tuple[np.ndarray, np.ndarray]):
-        # transfer input data to device
-        for i in range(len(inputs)):
-            cuda.memcpy_htod_async(self.d_inputs[i], inputs[i], self.stream)
+        for i in range(self.nInput):                                                     # copy input data from host buffer into device buffer
+            cudart.cudaMemcpy(bufferD[i], bufferH[i].ctypes.data, bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyHostToDevice)
 
-        # execute model
-        self.context.execute_async_v2(self.bindings, self.stream.handle, None)
-        # transfer predictions back
-        cuda.memcpy_dtoh_async(self.output, self.d_output, self.stream)
-        # syncronize threads
-        self.stream.synchronize()
-        return self.output
+        for i in range(self.nIO):
+            self.context.set_tensor_address(self.lTensorName[i], int(bufferD[i]))         # set address of all input and output data in device buffer
 
-    # warmup..
-    def warmup(self):
+        self.context.execute_async_v3(0)                                                   # do inference computation
+
+        for i in range(self.nInput, self.nIO):                                              # copy output data from device buffer into host buffer
+            cudart.cudaMemcpy(bufferH[i].ctypes.data, bufferD[i], bufferH[i].nbytes, cudart.cudaMemcpyKind.cudaMemcpyDeviceToHost)
+
+        for b in bufferD:                                                                   # free the GPU memory buffer after all work
+            cudart.cudaFree(b)
+        
+        return bufferH[2]
+
+    # Warmup 
+    def warmup(self, inputs: Tuple[np.ndarray, np.ndarray], runs: int = 150):
         logger.info("Warming up")
-        WARMUP_EPOCHS = 150
-        for _ in range(WARMUP_EPOCHS):
-            pred = self.predict((self.optical_batch, self.infrared_batch))
+        for _ in range(runs):
+            pred = self.run_trt_inference(inputs)
         logger.info("Warmup complete!")
     
-# fuse the images
-def fuse(model, dataset, batch_size = 1, shuffle=False, save_dir = None, target_dtype = "fp16"):
-    # define data loader object 
-    target_dtype = np.float16 if target_dtype == "fp16" else np.float32
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-    # get the images form the data loader with their unique name
-    for vi, ir, img_name in data_loader:
-        ir, vi = ir.permute(0, 2, 3, 1).numpy().astype(target_dtype), vi.permute(0, 2, 3, 1).numpy().astype(target_dtype)
-        fused = model.predict((vi, ir))
-        if len(fused.shape) == 4:
-            # Post process the image
-            fused = np.squeeze((fused[0]* 255).astype(np.uint8), axis=2)
-            if save_dir is not None:
-                # Creat fused directory to store images 
-                new_save_dir = os.path.join(save_dir, 'fused1')
-                os.makedirs(new_save_dir, exist_ok= True)
-                img_save_path = os.path.join(new_save_dir, img_name[0])
-                io.imsave(img_save_path, fused)
+
+# Plot fusion results
+def show_fusion_result(vi, ir, output):
+    images = []
+    arrays = [vi, ir, output]
+    for array in arrays:
+        img = np.squeeze(array, axis=(0, 1))
+        images.append(img)
+        
+    titles = ["optical", "thermal", "output"]
+    nrows, nclos = 1, 3
+    fig, axes = plt.subplots(nrows=nrows, ncols=nclos)
+
+    for k in range(nrows * nclos):
+        ax = axes[k]
+        ax.imshow(images[k], cmap = 'gray')
+        ax.set_title(titles[k])
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
 
 
+# Correct format
+def create_img_batch(loader, target_dtype = np.float16):
+    (vi, ir, img_name) = next(iter(loader))
+    ir_batch, vi_batch = ir.permute(0, 1, 2, 3).numpy().astype(target_dtype), vi.permute(0, 1, 2, 3).numpy().astype(target_dtype)
+    return (ir_batch, vi_batch, img_name)
 
 
 if __name__ == "__main__":
@@ -234,50 +248,34 @@ if __name__ == "__main__":
                                   ToTensor()])
     
     
-    # visualize inputs for debugging purposes
+    # create an instance of TensorRT runtime
     trt_runner = RunTRT(engine_file= engine_file, data_type= data_type, batch_size= batch, 
-                        image_shape= image_shape, img_transforms= transformation,
-                        homography_mat= args.homography)
+                        image_shape= image_shape)
     
-    
-    if args.data:
-        dataset = cDataset(dir=args.data, transforms= transformation,  homography_mat=args.homography)
-        logger.info("Running image fusion on the dataset")
-        fuse(trt_runner, dataset, args.batch, save_dir= args.save, target_dtype=data_type)
-    else:
-        logger.info("now run inference.")
-        vi_batch, ir_batch = trt_runner.optical_batch, trt_runner.infrared_batch
-        acc_time = 0
-        RUNS = 10
-        outputs = []
-        for _ in range(RUNS):
-            tic = time.time()
-            output = trt_runner.predict((vi_batch, ir_batch))
-            outputs.append(output)
-            toc = time.time()
-            duration = toc - tic
-            acc_time += duration
-        total_time = (acc_time/RUNS) * 1000
-        logger.info(f'WITH TRT: Avearge time taken to run a batch of {batch} images: {total_time: .3f} ms')
 
-        # visualize input data
-        plot = True
-        if plot:
-            max_len = len(outputs)
-            # print(max_len)
-            ind = random.randint(0, max_len)
-            images = [vi_batch[0], ir_batch[0], outputs[ind][0]]
-            titles = ["optical", "thermal", "output"]
-            nrows, nclos = 1, 3
-            fig, axes = plt.subplots(nrows=nrows, ncols=nclos)
+    # Load the dataset.
+    dataset = cDataset(args.data, transforms= transformation,  homography_mat=args.homography)
+    data_loader = DataLoader(dataset, batch_size=batch, shuffle=False)
 
-            # Loop through images and titles and plot them
-            for k in range(nrows * nclos):
-                ax = axes[k]
-                ax.imshow(images[k], cmap = 'gray')
-                ax.set_title(titles[k])
-                ax.axis('off')
-                # Adjust layout to prevent overlap
-            plt.tight_layout()
-            plt.show()
-        print('done!!')
+    # Get a batch for testing
+    ir, vi, image_name = create_img_batch(data_loader, target_dtype= np.float16 if data_type == "fp16" else np.float32)
+
+    # Run warmup before running actual inference.
+    WARMUP_RUNS = 200
+    trt_runner.warmup((ir, vi), runs= WARMUP_RUNS)
+
+    logger.info("now run inference and average the inference time.")
+    acc_time = 0
+    RUNS = 10
+    for _ in range(RUNS):
+        tic = time.time()
+        output = trt_runner.run_trt_inference((ir, vi))
+        toc = time.time()
+        duration = toc - tic
+        acc_time += duration
+    total_time = (acc_time/RUNS) * 1000
+    logger.info(f'WITH TRT: Avearge time taken to run a batch of {batch} images: {total_time: .3f} ms')
+
+    if args.plot:
+        show_fusion_result(vi, ir, output)
+
