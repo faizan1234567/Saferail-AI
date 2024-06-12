@@ -106,7 +106,6 @@ class cDataset:
 
 
 
-
 # run tnesorrt engine and customize it tpothe fusion task.
 class RunTRT:
     def __init__(self, engine_file: Path, data_type: str = "fp16", batch_size: int = 32,
@@ -209,7 +208,7 @@ def show_fusion_result(vi, ir, output):
     for array in arrays:
         img = np.squeeze(array, axis=(0, 1))
         images.append(img)
-        
+
     titles = ["optical", "thermal", "output"]
     nrows, nclos = 1, 3
     fig, axes = plt.subplots(nrows=nrows, ncols=nclos)
@@ -261,7 +260,7 @@ if __name__ == "__main__":
     ir, vi, image_name = create_img_batch(data_loader, target_dtype= np.float16 if data_type == "fp16" else np.float32)
 
     # Run warmup before running actual inference.
-    WARMUP_RUNS = 200
+    WARMUP_RUNS = 100
     trt_runner.warmup((ir, vi), runs= WARMUP_RUNS)
 
     logger.info("now run inference and average the inference time.")
