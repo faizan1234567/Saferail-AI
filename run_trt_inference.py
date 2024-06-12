@@ -194,7 +194,10 @@ class RunTRT:
         return bufferH[2]
 
     # Warmup 
-    def warmup(self, inputs: Tuple[np.ndarray, np.ndarray], runs: int = 150):
+    def warmup(self, inputs: Tuple[np.ndarray, np.ndarray] = None, runs: int = 150):
+        if inputs == None:
+            img = np.random.rand(1, 1, 640, 640).astype(np.float16)
+            inputs = (img, img)
         logger.info("Warming up")
         for _ in range(runs):
             pred = self.run_trt_inference(inputs)
