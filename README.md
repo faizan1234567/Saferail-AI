@@ -28,8 +28,7 @@ Installation compelete.
 Note: as we are deploying it on the jetson orin, please make sure to install pytorch version that matches with your jetpack version,
 more information: https://docs.nvidia.com/deeplearning/frameworks/install-pytorch-jetson-platform/index.html
 
-the implementation is in progress
-
+the deployment implementation is in progress
 
 
 
