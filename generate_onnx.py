@@ -1,17 +1,15 @@
 """
-
 Generate an ONNX file from a trained PyTorch model
 ==================================================
-INPUT: PyTorch model (.pt, .pth)
-OUTPUT: ONNX model(.onnx) 
 """
-# import dependencies
+
 import warnings
 warnings.filterwarnings('ignore')
 from typing import Dict, List, Tuple, Union
+from utils import export
+import numpy as np
 
 import torch
-import numpy as np
 import torchvision.models as models 
 import torch.onnx 
 from torchvision.transforms import Normalize
@@ -37,19 +35,28 @@ formatter = logging.Formatter(fmt = "%(asctime)s: %(message)s", datefmt= '%Y-%m-
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-def read_args():
+def read_args(known=False):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file_name', type = str, default= "fusion_onnx_640", help = 'path to save the generated onnx file')
     parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
-    parser.add_argument('--weights', type = str, default= "weights/v1/tardal-dt.pth", help = "path to the weights file")
-    parser.add_argument('--batch', type = int, default= 32,  help = "batch size")
-    opt = parser.parse_args()
+    parser.add_argument("--weights", type=str, default="TarDAL/weights/tardal-dt.pth", help="model.pt path(s)")
+    parser.add_argument('--batch', type = int, default= 1,  help = "batch size")
+    parser.add_argument("--dynamic", action="store_true", help="ONNX/TF/TensorRT: dynamic axes")
+    parser.add_argument("--simplify", action="store_true", help="ONNX: simplify model")
+    parser.add_argument("--opset", type=int, default=17, help="ONNX: opset version")
+    parser.add_argument(
+        "--include",
+        nargs="+",
+        default=["onnx"],
+        help="onnx, engine",
+    )
+    opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
 class Pt2ONNX:
-    
-    def __init__(self, trained_weights: Path, cfg: Union[Path, Dict], batch_size: int = 32,
-                 image_shape: Tuple[int, int, int]= (640, 640, 1)) -> None:
+    """Export to ONNX from PyTorch"""
+    def __init__(self, trained_weights: Path, cfg: Union[Path, Dict], batch_size: int = 1,
+                 image_shape: Tuple[int, int, int]= (640, 640, 1), dynamic: bool = False, 
+                 opset_version: int = 17, simplify: bool = False) -> None:
         """
         constructor method
         
@@ -61,6 +68,9 @@ class Pt2ONNX:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.batch_size = batch_size
         self.image_shape = (self.batch_size,) + image_shape
+        self.dynamic = dynamic
+        self.opset = opset_version
+        self.simplify = simplify
 
         # init config
         logger.info("Initializing Configuration settings!")
@@ -68,7 +78,7 @@ class Pt2ONNX:
             config = yaml.safe_load(Path(self.cfg).open('r'))
             self.config = from_dict(config)  # convert dict to object
         else:
-            self.config = config
+            self.config = self.cfg
         
         # init model
         logger.info("Initializing model")
@@ -107,7 +117,7 @@ class Pt2ONNX:
             weights.pop('use_eval')
         self.model.load_state_dict(weights)
 
-    def torch2onnx(self, onnx_save: Path = "", verbose: bool = False):
+    def torch2onnx(self):
         """
         convert PyTorch trained model to onnx model
         """
@@ -116,25 +126,21 @@ class Pt2ONNX:
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
         
-        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        onnx_save = onnx_save + f"_{timestamp}.onnx"
-        file_path = os.path.join(dir_name, onnx_save)
+        file_name = self.trained_weights.split("/")[-1]
+        f = Path(os.path.join(dir_name, file_name))
+        f = str(f.with_suffix(".onnx"))
         ir, vi = self.create_dummpy_data()
-        sample_output = self.model(ir, vi)
+        im = torch.cat((ir, vi), dim=1)
         try:
-             torch.onnx.export(self.model, args=(ir, vi), f=file_path, verbose=verbose, 
-                               export_params=True, do_constant_folding=True, input_names=["infrared", "optical"], 
-                               output_names= ["fused"], dynamic_axes= {'input' : {0: 'batch_size'}, 
-                                                                       'output' : {0: 'batch_size'}})
+            f = export(self.model, im, Path(f), dynamic=self.dynamic, opset=self.opset, simplify= self.simplify)
         except FileNotFoundError:
-            logger.info(f"File not Found {file_path}")
-
-
+            logger.info(f"File not Found {f}")
 
 if __name__ == "__main__":
     # read command line args
     args = read_args()
     logger.info("Generating ONNX file from a Trained PyTorch model")
-    onnx_converter = Pt2ONNX(trained_weights=args.weights, cfg=args.cfg, batch_size=args.batch, image_shape=(640, 640, 1))
-    onnx_converter.torch2onnx(args.file_name, False)
-    logger.info('done')
+    onnx_converter = Pt2ONNX(trained_weights=args.weights, cfg=args.cfg, batch_size=args.batch, image_shape=(640, 640, 1), 
+    dynamic= args.dynamic, opset_version= args.opset, simplify= args.simplify)
+    onnx_converter.torch2onnx()
+    logger.info('Conversion done')
