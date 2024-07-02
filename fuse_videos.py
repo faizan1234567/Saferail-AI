@@ -126,7 +126,8 @@ def image_fusion(frame1, frame2, homography, fuse, trt, transformation=None):
         fused_frame = fuse.inference(ir=frame1.to(device), vi=frame2_aligned.to(device))
     else:
         frame1, frame2_aligned = frame1.permute(0, 1, 2, 3).numpy().astype(np.float16), frame2_aligned.permute(0, 1, 2, 3).numpy().astype(np.float16)
-        fused_frame = fuse.run_trt_inference((frame1, frame2_aligned))
+        frames = np.concatenate((frame2_aligned, frame1), axis=1)
+        fused_frame = fuse.run_trt_inference(frames)
         # plt.imshow(fused_frame[0], cmap= 'gray')
         # plt.show()
         fused_frame = torch.from_numpy(fused_frame).permute(0, 1, 2, 3)

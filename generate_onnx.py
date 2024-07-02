@@ -1,6 +1,10 @@
 """
 Generate an ONNX file from a trained PyTorch model
 ==================================================
+
+for help 
+python generate_onnx.py -h
+===================================================
 """
 
 import warnings
@@ -11,7 +15,6 @@ import numpy as np
 
 import torch
 import torchvision.models as models 
-import torch.onnx 
 from torchvision.transforms import Normalize
 from torch import Tensor
 import logging
@@ -22,6 +25,7 @@ from TarDAL.config import ConfigDict, from_dict
 from pathlib import Path
 import os
 from datetime import datetime
+import onnx
 
 # from pipeline.fuse import Fuse
 from TarDAL.module.fuse.generator import Generator
@@ -40,15 +44,7 @@ def read_args(known=False):
     parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
     parser.add_argument("--weights", type=str, default="TarDAL/weights/tardal-dt.pth", help="model.pt path(s)")
     parser.add_argument('--batch', type = int, default= 1,  help = "batch size")
-    parser.add_argument("--dynamic", action="store_true", help="ONNX/TF/TensorRT: dynamic axes")
-    parser.add_argument("--simplify", action="store_true", help="ONNX: simplify model")
-    parser.add_argument("--opset", type=int, default=17, help="ONNX: opset version")
-    parser.add_argument(
-        "--include",
-        nargs="+",
-        default=["onnx"],
-        help="onnx, engine",
-    )
+    parser.add_argument("--opset", type=int, default=10, help="ONNX: opset version")
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
@@ -65,15 +61,14 @@ class Pt2ONNX:
 
         self.trained_weights = trained_weights
         self.cfg  = cfg
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.batch_size = batch_size
         self.image_shape = (self.batch_size,) + image_shape
-        self.dynamic = dynamic
         self.opset = opset_version
-        self.simplify = simplify
+       
 
         # init config
-        logger.info("Initializing Configuration settings!")
+        logger.info("Initializing Configuration settings! \n")
         if isinstance(self.cfg, str) or isinstance(self.cfg, Path):
             config = yaml.safe_load(Path(self.cfg).open('r'))
             self.config = from_dict(config)  # convert dict to object
@@ -81,12 +76,12 @@ class Pt2ONNX:
             self.config = self.cfg
         
         # init model
-        logger.info("Initializing model")
+        logger.info("Initializing model \n")
         f_dim, f_depth = self.config.fuse.dim, self.config.fuse.depth
         self.model = Generator(dim=f_dim, depth=f_depth)
 
         # load ckpt to the model
-        logger.info("Loading model weights to the model")
+        logger.info("Loading model weights to the model \n")
         map_location = lambda storage, loc: storage
         if torch.cuda.is_available():
             map_location = None
@@ -121,7 +116,7 @@ class Pt2ONNX:
         """
         convert PyTorch trained model to onnx model
         """
-        logger.info("Converting to ONNX from PyTorch")
+        logger.info("Converting to ONNX from PyTorch \n")
         dir_name = "onnx_files/"
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
@@ -132,15 +127,28 @@ class Pt2ONNX:
         ir, vi = self.create_dummpy_data()
         im = torch.cat((ir, vi), dim=1)
         try:
-            f = export(self.model, im, Path(f), dynamic=self.dynamic, opset=self.opset, simplify= self.simplify)
+            torch.onnx.export(self.model,
+                        im, 
+                        f, 
+                        verbose= False,
+                        export_params=True,
+                        do_constant_folding=True, 
+                        input_names=["image"],
+                        output_names=["fused"])
+            
+            # Checks
+            model_onnx = onnx.load(f)  # load onnx model
+            onnx.checker.check_model(model_onnx)  # check onnx model   
+                     
         except FileNotFoundError:
             logger.info(f"File not Found {f}")
+
 
 if __name__ == "__main__":
     # read command line args
     args = read_args()
-    logger.info("Generating ONNX file from a Trained PyTorch model")
+    logger.info("Generating ONNX file from a Trained PyTorch model\n")
     onnx_converter = Pt2ONNX(trained_weights=args.weights, cfg=args.cfg, batch_size=args.batch, image_shape=(640, 640, 1), 
-    dynamic= args.dynamic, opset_version= args.opset, simplify= args.simplify)
+    opset_version= args.opset)
     onnx_converter.torch2onnx()
     logger.info('Conversion done')

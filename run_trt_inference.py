@@ -130,7 +130,7 @@ class RunTRT:
         self.nOutput = [self.engine.get_tensor_mode(self.lTensorName[i]) for i in range(self.nIO)].count(trt.TensorIOMode.OUTPUT)  # get the count of output tensor
 
         self.context = self.engine.create_execution_context()                                 # create Excution Context from the engine (analogy to a GPU context, or a CPU process)
-        self.context.set_input_shape(self.lTensorName[0], (1, 1, 640, 640))                   # set actual size of input tensor if using Dynamic Shape mode
+        self.context.set_input_shape(self.lTensorName[0], (1, 2, 640, 640))                   # set actual size of input tensor if using Dynamic Shape mode
         
     def load_engine(self):
         self.logger = trt.Logger(trt.Logger.ERROR)                                 # create Logger, avaiable level: VERBOSE, INFO, WARNING, ERRROR, INTERNAL_ERROR
@@ -165,10 +165,9 @@ class RunTRT:
                 print("Succeeded saving .plan file!")
 
 
-    def run_trt_inference(self, inputs: Tuple[np.ndarray, np.ndarray]):
-        bufferH = []
-        for i in range(len(inputs)):                                                    # prepare the memory buffer on host and device
-            bufferH.append(np.ascontiguousarray(inputs[i]))
+    def run_trt_inference(self, inputs: np.ndarray):
+        bufferH = []                                                      # prepare the memory buffer on host and device
+        bufferH.append(np.ascontiguousarray(inputs))
 
         for i in range(self.nInput, self.nIO):
             bufferH.append(np.empty(self.context.get_tensor_shape(self.lTensorName[i]), dtype=trt.nptype(self.engine.get_tensor_dtype(self.lTensorName[i]))))
@@ -191,13 +190,13 @@ class RunTRT:
         for b in bufferD:                                                                   # free the GPU memory buffer after all work
             cudart.cudaFree(b)
         
-        return bufferH[2]
+        return bufferH[1]
 
     # Warmup 
     def warmup(self, inputs: Tuple[np.ndarray, np.ndarray] = None, runs: int = 150):
         if inputs == None:
             img = np.random.rand(1, 1, 640, 640).astype(np.float16)
-            inputs = (img, img)
+            inputs = np.concatenate((img, img), axis=1)
         logger.info("Warming up")
         for _ in range(runs):
             pred = self.run_trt_inference(inputs)
