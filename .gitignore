@@ -12,3 +12,5 @@ videos/
 
 safeRail/
 
+# vs code data
+.vscode/
