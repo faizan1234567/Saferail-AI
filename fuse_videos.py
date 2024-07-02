@@ -125,11 +125,12 @@ def image_fusion(frame1, frame2, homography, fuse, trt, transformation=None):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         fused_frame = fuse.inference(ir=frame1.to(device), vi=frame2_aligned.to(device))
     else:
-        frame1, frame2_aligned = frame1.permute(0, 2, 3, 1).numpy().astype(np.float16), frame2_aligned.permute(0, 2, 3, 1).numpy().astype(np.float16)
-        fused_frame = fuse.predict((frame1, frame2_aligned))
+        frame1, frame2_aligned = frame1.permute(0, 1, 2, 3).numpy().astype(np.float16), frame2_aligned.permute(0, 1, 2, 3).numpy().astype(np.float16)
+        frames = np.concatenate((frame2_aligned, frame1), axis=1)
+        fused_frame = fuse.run_trt_inference(frames)
         # plt.imshow(fused_frame[0], cmap= 'gray')
         # plt.show()
-        fused_frame = torch.from_numpy(fused_frame).permute(0, 3, 1, 2)
+        fused_frame = torch.from_numpy(fused_frame).permute(0, 1, 2, 3)
     infer_toc = time.time()
     infer_time = get_ms(infer_tic, infer_toc)
 
@@ -203,7 +204,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--video1', type = str, default = 'videos/1_optical.mp4', help = 'path to optical video')
     parser.add_argument('--video2', type = str, default = 'videos/1_thermal.mp4', help = 'path to thermal video')
-    parser.add_argument('--cfg', default='config/default.yaml', help='config file path')
+    parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
     parser.add_argument('--homography', type = str, default = 'camera_data/homography.npz', help = 'homography path')
     parser.add_argument('--engine', type = str, default= None, help = 'path to save the generated trt file')
     parser.add_argument('--fp16', action= "store_true",  help = 'use fp16 precisoin')
@@ -253,10 +254,9 @@ if __name__ == "__main__":
 
         # Initialize tensorrt wrapper
         logger.info("Create TensorRT engine instance for inference.")
-        trt_wrapper = RunTRT(args.engine, data_type= data_type, batch_size= args.batch, image_shape= image_shape,
-                                img_transforms= transformation, homography_mat= args.homography)
+        trt_wrapper = RunTRT(args.engine, data_type= data_type, batch_size= args.batch, image_shape= image_shape)
         logger.info("Warm up")
-        trt_wrapper.warmup()
+        trt_wrapper.warmup(runs=200)
         logger.info("Inference: using TensorRT")
         # Run inference
         process_frames(args.video1, args.video2, hmat, trt_wrapper, args.write, trt=True, transformation=frame_transformation)

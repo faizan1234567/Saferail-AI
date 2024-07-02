@@ -1,0 +1,18 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "args": ["--video1",  "videos/1_optical.mp4", "--video2",  "videos/1_thermal.mp4",
+             "--cfg",  "TarDAL/config/default.yaml", "--homography", "camera_data/homography.npz", "--engine", "tensorrt_files/tardal-dt.trt",  "--trt", 
+            "--batch", "1", "--fp16"],
+            "console": "integratedTerminal"
+        }
+    ]
+}
