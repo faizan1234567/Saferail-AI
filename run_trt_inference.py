@@ -56,7 +56,6 @@ def read_args():
     parser.add_argument('--batch', type = int, default=32, help = 'batch size')
     parser.add_argument('--homography', type = str, default = 'camera_data/homography.npz', help = 'homography path')
     parser.add_argument('--plot', action= "store_true", help = "plot fusion result")
-    parser.add_argument('--plot', action= "store_true", help = "plot fusion result")
     opt = parser.parse_args()
     return opt
 
@@ -287,7 +286,6 @@ if __name__ == "__main__":
     # create an instance of TensorRT runtime
     # create an instance of TensorRT runtime
     trt_runner = RunTRT(engine_file= engine_file, data_type= data_type, batch_size= batch, 
-                        image_shape= image_shape)
                         image_shape= image_shape)
     
 
