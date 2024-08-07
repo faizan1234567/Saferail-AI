@@ -6,12 +6,12 @@
     "configurations": [
         {
             "name": "Python Debugger: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "args": ["--video1",  "videos/1_optical.mp4", "--video2",  "videos/1_thermal.mp4",
-             "--cfg",  "TarDAL/config/default.yaml", "--homography", "camera_data/homography.npz", "--engine", "tensorrt_files/tardal-dt.trt",  "--trt", 
-            "--batch", "1", "--fp16"],
+             "--cfg",  "TarDAL/config/default.yaml", "--homography", "camera_data/homography.npz", "--engine", "tensorrt_files/tardal-7aug.trt", "--fusion"],
+            // "args": ["--weights",  "MetaFusion/weight/model_weight.pth",  "--batch",  "1",  "--model_name", "meta_fusion"],
             "console": "integratedTerminal"
         }
     ]

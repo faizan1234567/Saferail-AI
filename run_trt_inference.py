@@ -108,7 +108,7 @@ class cDataset:
 
 # run tnesorrt engine and customize it tpothe fusion task.
 class RunTRT:
-    def __init__(self, engine_file: Path, data_type: str = "fp16", batch_size: int = 32,
+    def __init__(self, engine_file: Path, data_type: str = "fp16", batch_size: int = 1,
                  image_shape: Tuple[int, int, int]= (640, 640, 1)):
         
         self.engine_file = engine_file
@@ -193,7 +193,7 @@ class RunTRT:
         return bufferH[1]
 
     # Warmup 
-    def warmup(self, inputs: Tuple[np.ndarray, np.ndarray] = None, runs: int = 150):
+    def warmup(self, inputs: Tuple[np.ndarray, np.ndarray] = None, runs: int = 200):
         if inputs == None:
             img = np.random.rand(1, 1, 640, 640).astype(np.float16)
             inputs = np.concatenate((img, img), axis=1)

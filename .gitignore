@@ -12,3 +12,7 @@ videos/
 
 safeRail/
 
+.vscode/
+
+
+.ipynb_checkpoints
