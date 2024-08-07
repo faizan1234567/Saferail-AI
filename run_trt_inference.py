@@ -15,6 +15,9 @@ import tensorrt as trt
 # import pycuda.driver as cuda
 # import pycuda.autoinit
 from cuda import cudart
+# import pycuda.driver as cuda
+# import pycuda.autoinit
+from cuda import cudart
 import argparse
 import logging
 import numpy as np
@@ -53,6 +56,7 @@ def read_args():
     parser.add_argument('--batch', type = int, default=32, help = 'batch size')
     parser.add_argument('--homography', type = str, default = 'camera_data/homography.npz', help = 'homography path')
     parser.add_argument('--plot', action= "store_true", help = "plot fusion result")
+    parser.add_argument('--plot', action= "store_true", help = "plot fusion result")
     opt = parser.parse_args()
     return opt
 
@@ -90,6 +94,7 @@ class cDataset:
             return None
 
 
+
     def __getitem__(self, ind):
         img_name = self.vi_images[ind]
         vi_image = os.path.join(self.vi, self.vi_images[ind])
@@ -103,6 +108,7 @@ class cDataset:
         # transform images if given
         vi, ir = self.data_transforms(vi), self.data_transforms(ir_aligned)
         return (vi, ir, img_name)
+
 
 
 
@@ -200,8 +206,37 @@ class RunTRT:
         logger.info("Warming up")
         for _ in range(runs):
             pred = self.run_trt_inference(inputs)
+        for _ in range(runs):
+            pred = self.run_trt_inference(inputs)
         logger.info("Warmup complete!")
     
+
+# Plot fusion results
+def show_fusion_result(vi, ir, output):
+    images = []
+    arrays = [vi, ir, output]
+    for array in arrays:
+        img = np.squeeze(array, axis=(0, 1))
+        images.append(img)
+
+    titles = ["optical", "thermal", "output"]
+    nrows, nclos = 1, 3
+    fig, axes = plt.subplots(nrows=nrows, ncols=nclos)
+
+    for k in range(nrows * nclos):
+        ax = axes[k]
+        ax.imshow(images[k], cmap = 'gray')
+        ax.set_title(titles[k])
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
+# Correct format
+def create_img_batch(loader, target_dtype = np.float16):
+    (vi, ir, img_name) = next(iter(loader))
+    ir_batch, vi_batch = ir.permute(0, 1, 2, 3).numpy().astype(target_dtype), vi.permute(0, 1, 2, 3).numpy().astype(target_dtype)
+    return (ir_batch, vi_batch, img_name)
 
 # Plot fusion results
 def show_fusion_result(vi, ir, output):
@@ -250,9 +285,13 @@ if __name__ == "__main__":
     
     
     # create an instance of TensorRT runtime
+    # create an instance of TensorRT runtime
     trt_runner = RunTRT(engine_file= engine_file, data_type= data_type, batch_size= batch, 
                         image_shape= image_shape)
+                        image_shape= image_shape)
     
+
+    # Load the dataset.
 
     # Load the dataset.
     dataset = cDataset(args.data, transforms= transformation,  homography_mat=args.homography)
@@ -276,6 +315,29 @@ if __name__ == "__main__":
         acc_time += duration
     total_time = (acc_time/RUNS) * 1000
     logger.info(f'WITH TRT: Avearge time taken to run a batch of {batch} images: {total_time: .3f} ms')
+    data_loader = DataLoader(dataset, batch_size=batch, shuffle=False)
+
+    # Get a batch for testing
+    ir, vi, image_name = create_img_batch(data_loader, target_dtype= np.float16 if data_type == "fp16" else np.float32)
+
+    # Run warmup before running actual inference.
+    WARMUP_RUNS = 100
+    trt_runner.warmup((ir, vi), runs= WARMUP_RUNS)
+
+    logger.info("now run inference and average the inference time.")
+    acc_time = 0
+    RUNS = 10
+    for _ in range(RUNS):
+        tic = time.time()
+        output = trt_runner.run_trt_inference((ir, vi))
+        toc = time.time()
+        duration = toc - tic
+        acc_time += duration
+    total_time = (acc_time/RUNS) * 1000
+    logger.info(f'WITH TRT: Avearge time taken to run a batch of {batch} images: {total_time: .3f} ms')
+
+    if args.plot:
+        show_fusion_result(vi, ir, output)
 
     if args.plot:
         show_fusion_result(vi, ir, output)

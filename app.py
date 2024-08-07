@@ -232,6 +232,7 @@ if __name__ == "__main__":
     parser.add_argument('--video1', type = str, default = 'videos/1_optical.mp4', help = 'path to optical video')
     parser.add_argument('--video2', type = str, default = 'videos/1_thermal.mp4', help = 'path to thermal video')
     parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
+    parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
     parser.add_argument('--homography', type = str, default = 'camera_data/homography.npz', help = 'homography path')
     parser.add_argument('--engine', type = str, default= None, help = 'path to save the generated trt file')
     parser.add_argument('--write', action = 'store_true', help = 'flag to save the video')

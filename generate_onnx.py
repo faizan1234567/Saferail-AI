@@ -12,6 +12,8 @@ warnings.filterwarnings('ignore')
 from typing import Dict, List, Tuple, Union
 from utils import export
 import numpy as np
+from utils import export
+import numpy as np
 
 import torch
 import torchvision.models as models 
@@ -22,9 +24,11 @@ import time
 import argparse
 import yaml
 from TarDAL.config import ConfigDict, from_dict
+from TarDAL.config import ConfigDict, from_dict
 from pathlib import Path
 import os
 from datetime import datetime
+import onnx
 import onnx
 
 # from pipeline.fuse import Fuse
@@ -41,6 +45,7 @@ stream_handler = logging.StreamHandler()
 formatter = logging.Formatter(fmt = "%(asctime)s: %(message)s", datefmt= '%Y-%m-%d %H:%M%S')
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
+
 
 def read_args(known=False):
     parser = argparse.ArgumentParser()
@@ -159,6 +164,7 @@ class Pt2ONNX:
             onnx.checker.check_model(model_onnx)  # check onnx model   
                      
         except FileNotFoundError:
+            logger.info(f"File not Found {f}")
             logger.info(f"File not Found {f}")
 
 
