@@ -1,0 +1,22 @@
+TRT-8502-EntropyCalibration2
+image: 3fe9c1a6
+/Slice_output_0: 3fe9c1a6
+/encoder/encoder.0/Conv_output_0: 417e195b
+/encoder/encoder.2/Relu_output_0: 417e195b
+/dense.0/dense.0.0/Conv_output_0: 421fcd06
+/dense.0/dense.0.2/Relu_output_0: 4202dbce
+/Concat_output_0: 41ff985e
+/dense.1/dense.1.0/Conv_output_0: 42eae37b
+/dense.1/dense.1.2/Relu_output_0: 42eae37b
+/Concat_1_output_0: 42dd2f30
+/dense.2/dense.2.0/Conv_output_0: 43a5e1e3
+/dense.2/dense.2.2/Relu_output_0: 43489546
+/Concat_2_output_0: 433e26bf
+/fuse/fuse.0/fuse.0.0/Conv_output_0: 46144ca2
+/fuse/fuse.0/fuse.0.1/Relu_output_0: 459a016a
+/fuse/fuse.1/fuse.1.0/Conv_output_0: 44e55000
+/fuse/fuse.1/fuse.1.2/Relu_output_0: 44c96b43
+/fuse/fuse.2/fuse.2.0/Conv_output_0: 4490ffac
+/fuse/fuse.2/fuse.2.2/Relu_output_0: 448dd846
+/fuse/fuse.3/fuse.3.0/Conv_output_0: 4492fb33
+fused: 3c010a14

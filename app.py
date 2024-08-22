@@ -216,7 +216,7 @@ def process_frames(video_path1, video_path2, homography, fuse, write=False, trt 
         if write:
             out.write(frame)
         
-        cv2.imshow('detection Frame', frame)
+        cv2.imshow('detection Frame', cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     

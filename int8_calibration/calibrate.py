@@ -8,10 +8,16 @@ from cuda import cudart
 
 
 # implementation of calibration script
-class Calibrator(trt.IInt8Calibrator):
+#  # trt.IInt8Calibrator
+# calibrator
+#IInt8EntropyCalibrator2
+#IInt8LegacyCalibrator
+#IInt8EntropyCalibrator
+#IInt8MinMaxCalibrator
+class Calibrator(trt.IInt8LegacyCalibrator):
     
     def __init__(self, calibaration_path, nCalibration, inputShape, cacheFile):
-        trt.IInt8Calibrator.__init__(self)
+        trt.IInt8LegacyCalibrator.__init__(self)
 
         # self.imageList = glob(calibaration_path + "*.jpg")[:100]
         self.vi = os.path.join(calibaration_path, "vi")
@@ -24,7 +30,7 @@ class Calibrator(trt.IInt8Calibrator):
         _, self.dIn = cudart.cudaMalloc(self.buffeSize)
         self.oneBatch = self.batchGenerator()
 
-        print(int(self.dIn))
+        # print(int(self.dIn))
 
     def __del__(self):
         cudart.cudaFree(self.dIn)    
@@ -35,11 +41,14 @@ class Calibrator(trt.IInt8Calibrator):
             subImageList = np.random.choice(self.imageList, self.shape[0], replace=False)
             yield np.ascontiguousarray(self.loadImageList(subImageList))
     
+    
     def loadImageList(self, imageList):
         res = np.empty(self.shape, dtype=np.float32)
         for i in range(self.shape[0]):
             vi_img = cv2.imread(os.path.join(self.vi, imageList[i]), cv2.IMREAD_GRAYSCALE).astype(np.float32)
             ir_img = cv2.imread(os.path.join(self.ir, imageList[i]), cv2.IMREAD_GRAYSCALE).astype(np.float32)
+            
+            #resize
             vi_img = cv2.resize(vi_img, self.shape[2:])
             ir_img = cv2.resize(ir_img, self.shape[2:])
             

@@ -34,9 +34,6 @@ import onnx
 # from pipeline.fuse import Fuse
 from TarDAL.module.fuse.generator import Generator
 
-# meta fusion
-from MetaFusion.models.metafusion_net import FusionNet as FusionNetwork
-
 # configure logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,7 +49,7 @@ def read_args(known=False):
     parser.add_argument('--cfg', default='TarDAL/config/default.yaml', help='config file path')
     parser.add_argument("--weights", type=str, default="TarDAL/weights/v1/tardal-dt.pth", help="model.pt path(s)")
     parser.add_argument('--batch', type = int, default= 1,  help = "batch size")
-    parser.add_argument('--model_name', choices=["tardal", "meta_fusion"], type = str, default= "tardal-dt",  help = "Name of the image fusion model")
+    parser.add_argument('--model_name', choices=["tardal", "meta_fusion"], type = str, default= "tardal",  help = "Name of the image fusion model")
     opt = parser.parse_known_args()[0] if known else parser.parse_args()
     return opt
 
@@ -153,11 +150,13 @@ class Pt2ONNX:
             torch.onnx.export(self.model,
                         im, 
                         f, 
-                        verbose= False,
-                        export_params=True,
-                        do_constant_folding=True, 
+                        verbose= False, 
                         input_names=["image"],
-                        output_names=["fused"])
+                        output_names=["fused"], 
+                         dynamic_axes={                                 #   Keep the batch dimension dynamic
+                                    'input':  {0: 'batch_size'},         # Specify dynamic batch size for input
+                                    'output': {0: 'batch_size'}})         # Specify dynamic batch size for output
+
             
             # Checks
             model_onnx = onnx.load(f)  # load onnx model
@@ -174,9 +173,6 @@ if __name__ == "__main__":
     logger.info("Generating ONNX file from a Trained PyTorch model\n")
     if args.model_name == "tardal":
         model = load_tardal(args.weights, args.cfg)
-    elif args.model_name == "meta_fusion":
-        model = FusionNetwork(block_num=3, feature_out=False)
-        model = load_meta_fusion(model, args.weights)
     onnx_converter = Pt2ONNX(model=model, batch_size=args.batch, image_shape=(640, 640, 1), 
     opset_version= 17)
     onnx_converter.torch2onnx(args.model_name)

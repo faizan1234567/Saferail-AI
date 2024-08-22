@@ -10,8 +10,9 @@
             "request": "launch",
             "program": "${file}",
             "args": ["--video1",  "videos/1_optical.mp4", "--video2",  "videos/1_thermal.mp4",
-             "--cfg",  "TarDAL/config/default.yaml", "--homography", "camera_data/homography.npz", "--engine", "tensorrt_files/tardal-7aug.trt", "--fusion"],
+             "--cfg",  "TarDAL/config/default.yaml", "--homography", "camera_data/homography.npz", "--engine", "tensorrt_files/tardal-21aug.trt", "--fusion"],
             // "args": ["--weights",  "MetaFusion/weight/model_weight.pth",  "--batch",  "1",  "--model_name", "meta_fusion"],
+          //  "args": ["--onnx", "onnx_files/tardal.onnx", "--engine", "tensorrt_files/tardal-19aug.engine", "--data", "images/", "--int8"],
             "console": "integratedTerminal"
         }
     ]

@@ -16,3 +16,6 @@ safeRail/
 .vscode/
 
 .ipynb_checkpoints
+
+# images
+images/

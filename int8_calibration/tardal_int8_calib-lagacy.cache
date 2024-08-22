@@ -1,0 +1,11 @@
+0 0 0
+image: 4005a5f8
+/encoder/encoder.2/Relu_output_0: 418cbe46
+/dense.0/dense.0.2/Relu_output_0: 4227e617
+/dense.1/dense.1.2/Relu_output_0: 4337ba07
+/dense.2/dense.2.2/Relu_output_0: 3dc94bb6
+/fuse/fuse.0/fuse.0.1/Relu_output_0: 46024bac
+/fuse/fuse.1/fuse.1.2/Relu_output_0: 3f48426b
+/fuse/fuse.2/fuse.2.2/Relu_output_0: 3f0fc214
+/fuse/fuse.3/fuse.3.0/Conv_output_0: 449e3dd3
+fused: 3c010204
