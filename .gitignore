@@ -1,5 +1,5 @@
 # tensorrt files
-tensorrt_files/
+engine_files/
 
 # onnx generated files
 onnx_files/
