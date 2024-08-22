@@ -14,10 +14,10 @@ from cuda import cudart
 #IInt8LegacyCalibrator
 #IInt8EntropyCalibrator
 #IInt8MinMaxCalibrator
-class Calibrator(trt.IInt8LegacyCalibrator):
+class Calibrator(trt.IInt8MinMaxCalibrator):
     
     def __init__(self, calibaration_path, nCalibration, inputShape, cacheFile):
-        trt.IInt8LegacyCalibrator.__init__(self)
+        trt.IInt8MinMaxCalibrator.__init__(self)
 
         # self.imageList = glob(calibaration_path + "*.jpg")[:100]
         self.vi = os.path.join(calibaration_path, "vi")
